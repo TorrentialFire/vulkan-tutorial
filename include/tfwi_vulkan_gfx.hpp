@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <vector>
+#include <set>
 #include <string>
 #include <algorithm>
 #include <optional>
