@@ -26,7 +26,7 @@ void DestroyDebugUtilsMessengerEXT(
 		func(instance, debugMessenger, pAllocator);
 	}
 }
-#endif
+#endif // !NDEBUG
 
 class HelloTriangleApplication {
 public:
@@ -51,7 +51,7 @@ public:
 
 		return VK_FALSE;
 	}
-#endif
+#endif // !NDEBUG
 
 	void run() {
 		initWindow();
@@ -65,7 +65,7 @@ private:
 	VkInstance instance;
 #ifndef NDEBUG
 	VkDebugUtilsMessengerEXT debugMessenger;
-#endif
+#endif // !NDEBUG
 
 	void initWindow() {
 		glfwInit();
@@ -76,6 +76,24 @@ private:
 		window = glfwCreateWindow(window_width, window_height, "Learn Vulkan", nullptr, nullptr);
 	}
 
+#ifndef NDEBUG
+	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo) {
+		createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+		createInfo.messageSeverity =
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+		createInfo.messageType =
+			VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+			VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+		createInfo.pfnUserCallback = debugCallback;
+
+	}
+#endif // !NDEBUG
+	
 	void createInstance() {
 		VkApplicationInfo appInfo{};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -130,10 +148,11 @@ private:
 			}
 		}
 
-		createInfo.enabledExtensionCount = glfwRequiredExtCount;
+		createInfo.enabledExtensionCount = allRequiredExts.size();
 		createInfo.ppEnabledExtensionNames = allRequiredExts.data();
 
-
+		// We forward declare "debugCreateInfo" here so that it is still in-scope when our instance is actually created (ensuring it is not deleted before it can be used)
+		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
 		if (enableValidationLayers) {
 
 			uint32_t vkLayerCount = 0;
@@ -165,9 +184,14 @@ private:
 
 			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 			createInfo.ppEnabledLayerNames = validationLayers.data();
+
+			populateDebugMessengerCreateInfo(debugCreateInfo);
+			createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
 		}
 		else {
 			createInfo.enabledLayerCount = 0;
+
+			createInfo.pNext = nullptr;
 		}
 
 		if (vkCreateInstance(&createInfo, nullptr, &instance)) {
@@ -179,19 +203,8 @@ private:
 #ifndef NDEBUG
 	void setupDebugMessenger() {
 
-		VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-		createInfo.messageSeverity =
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-		createInfo.messageType =
-			VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-			VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-		createInfo.pfnUserCallback = debugCallback;
-		createInfo.pUserData = nullptr;
+		VkDebugUtilsMessengerCreateInfoEXT createInfo;
+		populateDebugMessengerCreateInfo(createInfo);
 
 		if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != VK_SUCCESS) {
 			throw std::runtime_error("Failed to set up debug mesenger!");
@@ -214,7 +227,7 @@ private:
 
 	void cleanup() {
 #ifndef NDEBUG
-		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+		//DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 #endif
 		vkDestroyInstance(instance, nullptr);
 		glfwDestroyWindow(window);
