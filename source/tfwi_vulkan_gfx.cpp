@@ -26,20 +26,17 @@ void DestroyDebugUtilsMessengerEXT(
 		func(instance, debugMessenger, pAllocator);
 	}
 }
-#endif // !NDEBUG
+#endif
 
 class HelloTriangleApplication {
 public:
 	const uint32_t window_width = 800;
 	const uint32_t window_height = 600;
+	
+#ifndef NDEBUG
 	const std::vector<const char*> validationLayers = {
 		"VK_LAYER_KHRONOS_validation"
 	};
-
-#ifdef NDEBUG
-	const bool enableValidationLayers = false;
-#else
-	const bool enableValidationLayers = true;
 
 	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -51,7 +48,7 @@ public:
 
 		return VK_FALSE;
 	}
-#endif // !NDEBUG
+#endif
 
 	void run() {
 		initWindow();
@@ -65,7 +62,7 @@ private:
 	VkInstance instance;
 #ifndef NDEBUG
 	VkDebugUtilsMessengerEXT debugMessenger;
-#endif // !NDEBUG
+#endif
 
 	void initWindow() {
 		glfwInit();
@@ -92,7 +89,7 @@ private:
 		createInfo.pfnUserCallback = debugCallback;
 
 	}
-#endif // !NDEBUG
+#endif
 	
 	void createInstance() {
 		VkApplicationInfo appInfo{};
@@ -115,9 +112,9 @@ private:
 		const char** rawRequiredExts = glfwGetRequiredInstanceExtensions(&glfwRequiredExtCount);
 		std::vector<const char*> allRequiredExts(rawRequiredExts, rawRequiredExts + glfwRequiredExtCount);
 
-		if (enableValidationLayers) {
-			allRequiredExts.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-		}
+#ifndef NDEBUG
+		allRequiredExts.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#endif
 
 		std::cout << "Extensions required:\n";
 		for (const char* extension : allRequiredExts) {
@@ -151,48 +148,47 @@ private:
 		createInfo.enabledExtensionCount = allRequiredExts.size();
 		createInfo.ppEnabledExtensionNames = allRequiredExts.data();
 
+		
+#ifndef NDEBUG
 		// We forward declare "debugCreateInfo" here so that it is still in-scope when our instance is actually created (ensuring it is not deleted before it can be used)
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
-		if (enableValidationLayers) {
+		uint32_t vkLayerCount = 0;
+		vkEnumerateInstanceLayerProperties(&vkLayerCount, nullptr);
+		std::vector<VkLayerProperties> vkAvailableLayers(vkLayerCount);
+		vkEnumerateInstanceLayerProperties(&vkLayerCount, vkAvailableLayers.data());
 
-			uint32_t vkLayerCount = 0;
-			vkEnumerateInstanceLayerProperties(&vkLayerCount, nullptr);
-			std::vector<VkLayerProperties> vkAvailableLayers(vkLayerCount);
-			vkEnumerateInstanceLayerProperties(&vkLayerCount, vkAvailableLayers.data());
-
-			std::cout << "Validation layers available:\n";
-			for (auto& layerProperties : vkAvailableLayers) {
-				std::cout << '\t' << layerProperties.layerName << '\n';
-			}
-
-			bool allLayersAvailable = true;
-			std::cout << "Validation layers requested:\n";
-			for (const char* layerName : validationLayers) {
-				std::cout << '\t' << layerName << '\n';
-
-				allLayersAvailable &= std::any_of(
-					vkAvailableLayers.begin(),
-					vkAvailableLayers.end(),
-					[layerName](VkLayerProperties availableLayer) {
-						return !strcmp(availableLayer.layerName, layerName);
-					});
-			}
-
-			if (!allLayersAvailable) {
-				throw std::runtime_error("Validation layers requested, but not available!");
-			}
-
-			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-			createInfo.ppEnabledLayerNames = validationLayers.data();
-
-			populateDebugMessengerCreateInfo(debugCreateInfo);
-			createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
+		std::cout << "Validation layers available:\n";
+		for (auto& layerProperties : vkAvailableLayers) {
+			std::cout << '\t' << layerProperties.layerName << '\n';
 		}
-		else {
-			createInfo.enabledLayerCount = 0;
 
-			createInfo.pNext = nullptr;
+		bool allLayersAvailable = true;
+		std::cout << "Validation layers requested:\n";
+		for (const char* layerName : validationLayers) {
+			std::cout << '\t' << layerName << '\n';
+
+			allLayersAvailable &= std::any_of(
+				vkAvailableLayers.begin(),
+				vkAvailableLayers.end(),
+				[layerName](VkLayerProperties availableLayer) {
+					return !strcmp(availableLayer.layerName, layerName);
+				});
 		}
+
+		if (!allLayersAvailable) {
+			throw std::runtime_error("Validation layers requested, but not available!");
+		}
+
+		createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+		createInfo.ppEnabledLayerNames = validationLayers.data();
+
+		populateDebugMessengerCreateInfo(debugCreateInfo);
+		createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
+#else
+		createInfo.enabledLayerCount = 0;
+
+		createInfo.pNext = nullptr;
+#endif
 
 		if (vkCreateInstance(&createInfo, nullptr, &instance)) {
 			throw std::runtime_error("Failed to create instance!");
@@ -227,7 +223,7 @@ private:
 
 	void cleanup() {
 #ifndef NDEBUG
-		//DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 #endif
 		vkDestroyInstance(instance, nullptr);
 		glfwDestroyWindow(window);
