@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <optional>
 
 // 3rd Party Libraries
 #define GLFW_INCLUDE_VULKAN

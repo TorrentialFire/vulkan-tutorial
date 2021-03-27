@@ -28,11 +28,43 @@ void DestroyDebugUtilsMessengerEXT(
 }
 #endif
 
+struct QueueFamilyIndices {
+	std::optional<uint32_t> graphicsFamily;
+
+	bool isComplete() {
+		return graphicsFamily.has_value();
+	}
+};
+
+QueueFamilyIndices FindQueueFamilyIndices(VkPhysicalDevice device) {
+	QueueFamilyIndices indices;
+
+	uint32_t queueFamilyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+	int i = 0;
+	for (const auto& queueFamily : queueFamilies) {
+		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+			indices.graphicsFamily = i;
+		}
+
+		if (indices.isComplete()) {
+			break;
+		}
+
+		i++;
+	}
+
+	return indices;
+}
+
 class HelloTriangleApplication {
 public:
 	const uint32_t window_width = 800;
 	const uint32_t window_height = 600;
-	
+
 #ifndef NDEBUG
 	const std::vector<const char*> validationLayers = {
 		"VK_LAYER_KHRONOS_validation"
@@ -60,6 +92,8 @@ public:
 private:
 	GLFWwindow* window;
 	VkInstance instance;
+	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	VkDevice device;
 #ifndef NDEBUG
 	VkDebugUtilsMessengerEXT debugMessenger;
 #endif
@@ -90,7 +124,7 @@ private:
 
 	}
 #endif
-	
+
 	void createInstance() {
 		VkApplicationInfo appInfo{};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -135,11 +169,11 @@ private:
 		// Make sure the drivers on the system support the required extensions.
 		for (const char* requiredExt : allRequiredExts) {
 			if (!std::any_of(
-					vkSupportedExts.begin(), 
-					vkSupportedExts.end(), 
-					[requiredExt](VkExtensionProperties ext) { 
-						return !strcmp(ext.extensionName, requiredExt); 
-					})) {
+				vkSupportedExts.begin(),
+				vkSupportedExts.end(),
+				[requiredExt](VkExtensionProperties ext) {
+					return !strcmp(ext.extensionName, requiredExt);
+				})) {
 				std::string required = "Vulkan driver missing required extension " + std::string(requiredExt);
 				throw std::runtime_error(required);
 			}
@@ -148,7 +182,7 @@ private:
 		createInfo.enabledExtensionCount = allRequiredExts.size();
 		createInfo.ppEnabledExtensionNames = allRequiredExts.data();
 
-		
+
 #ifndef NDEBUG
 		// We forward declare "debugCreateInfo" here so that it is still in-scope when our instance is actually created (ensuring it is not deleted before it can be used)
 		VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
@@ -193,7 +227,7 @@ private:
 		if (vkCreateInstance(&createInfo, nullptr, &instance)) {
 			throw std::runtime_error("Failed to create instance!");
 		}
-		
+
 	}
 
 #ifndef NDEBUG
@@ -208,11 +242,83 @@ private:
 	}
 #endif
 
+	bool isDeviceSuitable(VkPhysicalDevice device) {
+		QueueFamilyIndices indices = FindQueueFamilyIndices(device);
+
+		return indices.graphicsFamily.has_value();
+	}
+
+	void pickPhysicalDevice() {
+		uint32_t deviceCount = 0;
+		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+		if (deviceCount == 0) {
+			throw std::runtime_error("Failed to find GPUs with Vulkan support!");
+		}
+
+		std::vector<VkPhysicalDevice> devices(deviceCount);
+		vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+		
+		std::vector<VkPhysicalDeviceProperties> allDeviceProperties(deviceCount);
+		std::cout << "Vulkan is supported on the following system devices:\n";
+		for (int i = 0; i < deviceCount; i++) {
+			VkPhysicalDevice device = devices[i];
+			VkPhysicalDeviceProperties deviceProperties;
+			vkGetPhysicalDeviceProperties(device, &deviceProperties);
+			allDeviceProperties.push_back(deviceProperties);
+
+			std::cout << '\t' << i << ": " << deviceProperties.deviceName << '\n';
+			std::cout << "\t\t" << "Device ID: "		<< '\t' << deviceProperties.deviceID		<< '\n';
+			std::cout << "\t\t" << "Device Type: "		<< '\t' << deviceProperties.deviceType		<< '\n';
+			std::cout << "\t\t" << "Driver Version: "			<< deviceProperties.driverVersion	<< '\n';
+			std::cout << "\t\t" << "Vendor ID: "		<< '\t' << deviceProperties.vendorID		<< '\n';
+			std::cout << "\t\t" << "API Version: "		<< '\t' << deviceProperties.apiVersion		<< '\n';
+		}
+
+		// For now, we just pick the first device (Vulkan Tutorial pg. 62 for suitability checks)
+		physicalDevice = devices[0];
+	}
+
+	void createLogicalDevice() {
+		QueueFamilyIndices indices = FindQueueFamilyIndices(physicalDevice);
+
+		VkDeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+		queueCreateInfo.queueCount = 1;
+
+		float queuePriority = 1.0f;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		// We'll be doing more interesting things with this later...
+		VkPhysicalDeviceFeatures deviceFeatures{};
+
+		VkDeviceCreateInfo createInfo{};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+		createInfo.queueCreateInfoCount = 1;
+		createInfo.pEnabledFeatures = &deviceFeatures;
+		createInfo.enabledExtensionCount = 0;
+
+#ifndef NDEBUG
+		createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+		createInfo.ppEnabledLayerNames = validationLayers.data();
+#else
+		createInfo.enabledLayerCount = 0;
+#endif
+		
+		if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create logical device!");
+		}
+	}
+
 	void initVulkan() {
 		createInstance();
 #ifndef NDEBUG
 		setupDebugMessenger();
 #endif
+		pickPhysicalDevice();
+		createLogicalDevice();
 	}
 	
 	void mainLoop() {
@@ -222,6 +328,7 @@ private:
 	}
 
 	void cleanup() {
+		vkDestroyDevice(device, nullptr);
 #ifndef NDEBUG
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 #endif
