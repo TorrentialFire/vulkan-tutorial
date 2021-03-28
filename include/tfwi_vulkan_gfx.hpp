@@ -4,6 +4,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
+#include <cstdint>
 #include <vector>
 #include <set>
 #include <string>
