@@ -10,6 +10,7 @@
 #include <string>
 #include <algorithm>
 #include <optional>
+#include <fstream>
 
 // 3rd Party Libraries
 #define GLFW_INCLUDE_VULKAN
