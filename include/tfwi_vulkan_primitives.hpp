@@ -24,3 +24,9 @@ typedef struct Vertex {
 	static VkVertexInputBindingDescription getBindingDescription();
 	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
 } Vertex;
+
+typedef struct UniformBufferObject {
+	glm::mat4 model;
+	glm::mat4 view;
+	glm::mat4 proj;
+} UniformBufferObject;
