@@ -10,6 +10,10 @@ configure_file("include/tfwi_vulkan_gfx_config.hpp.in" "include/tfwi_vulkan_gfx_
 
 find_package(Vulkan REQUIRED FATAL_ERROR)
 
+target_sources(${PROJECT_NAME} PRIVATE
+	"source/tfwi_vulkan_primitives.cpp"
+)
+
 # Includes
 target_include_directories(${PROJECT_NAME} PUBLIC 
 	"${PROJECT_BINARY_DIR}/include"
